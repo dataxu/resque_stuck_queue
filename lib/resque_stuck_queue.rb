@@ -227,9 +227,14 @@ module Resque
           config[:heartbeat_job].call
         else
           queues.each do |queue_name|
-            # Redis::Namespace.new support as well as Redis.new
-            namespace = redis.respond_to?(:namespace) ? redis.namespace : nil
-            Resque.enqueue_to(queue_name, HeartbeatJob, heartbeat_key_for(queue_name), redis.client.host, redis.client.port, namespace, Time.now.to_i )
+            begin
+              # Redis::Namespace.new support as well as Redis.new
+              namespace = redis.respond_to?(:namespace) ? redis.namespace : nil
+              Resque.enqueue_to(queue_name, HeartbeatJob, heartbeat_key_for(queue_name), redis.client.host, redis.client.port, namespace, Time.now.to_i )
+            rescue Redis::CannotConnectError => e
+              logger.error("Enqueuing heartbeat job for #{queue_name} crashed: #{e.inspect}")
+              logger.error("\n#{e.backtrace.join("\n")}")
+            end
           end
         end
       end
