@@ -62,11 +62,11 @@ module Resque
       end
 
       def disconnect_recovery
-        if !config[:disconnect_recovery].nil?
-          config[:disconnect_recovery] # allow overriding w true
-        else
-          false # default
-        end
+        config[:disconnect_recovery]
+      end
+
+      def recovery_interval
+        config[:recovery_interval] || 2.seconds
       end
 
       def start_in_background
@@ -334,7 +334,11 @@ module Resque
         message = error_message.respond_to?(:call) ? error_message.call(e) : error_message
         logger.error(message)
         logger.error("\n#{e.backtrace.join("\n")}")
-        raise e unless disconnect_recovery
+        if disconnect_recovery
+          sleep recovery_interval
+        else
+          raise e
+        end
       end
     end
   end

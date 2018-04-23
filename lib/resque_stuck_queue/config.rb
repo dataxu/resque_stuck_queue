@@ -34,6 +34,7 @@ module Resque
         :heartbeat_job       => "optional, your own custom refreshing job. if you are using something other than resque",
         :enable_signals      => "optional, allow resque::stuck's signal_handlers which do mostly nothing at this point. possible future plan: log info, reopen log file, etc.",
         :disconnect_recovery => "optional, continues running resque-stuck-queue even if there is an issue connecting to redis. Will continue looping and making attempts until connection is re-established. Default is false",
+        :recovery_interval   => "optional, set to how oftern to try and connect to redis if there is a network failure. Defaults to 2 seconds.",
       }
 
       OPTIONS = OPTIONS_DESCRIPTIONS.keys
