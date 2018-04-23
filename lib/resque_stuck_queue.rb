@@ -171,22 +171,25 @@ module Resque
           Thread.current.abort_on_exception = abort_on_exception
           log_starting_thread(:watcher)
           while @running
-            mutex = RedisMutex.new(:resque_stuck_queue, :block => 0)
-            if mutex.lock
-              begin
-                queues.each do |queue_name|
-                  log_watcher_info(queue_name)
-                  if should_trigger?(queue_name)
-                    trigger_handler(queue_name, :triggered)
-                  elsif should_recover?(queue_name)
-                    trigger_handler(queue_name, :recovered)
+            error_lambda = lambda { |e| "Watcher thread couldn't access redis: #{e.inspect}" }
+            handle_redis_disconnect(error_lambda) do
+              mutex = RedisMutex.new(:resque_stuck_queue, :block => 0)
+              if mutex.lock
+                begin
+                  queues.each do |queue_name|
+                    log_watcher_info(queue_name)
+                    if should_trigger?(queue_name)
+                      trigger_handler(queue_name, :triggered)
+                    elsif should_recover?(queue_name)
+                      trigger_handler(queue_name, :recovered)
+                    end
                   end
+                ensure
+                  mutex.unlock
                 end
-              ensure
-                mutex.unlock
               end
+              wait_for_it(:watcher_interval)
             end
-            wait_for_it(:watcher_interval)
           end
         end
       end
@@ -227,13 +230,11 @@ module Resque
           config[:heartbeat_job].call
         else
           queues.each do |queue_name|
-            begin
+            error_lambda = lambda { |e| "Enqueuing heartbeat job for #{queue_name} crashed: #{e.inspect}" }
+            handle_redis_disconnect(error_lambda) do
               # Redis::Namespace.new support as well as Redis.new
               namespace = redis.respond_to?(:namespace) ? redis.namespace : nil
               Resque.enqueue_to(queue_name, HeartbeatJob, heartbeat_key_for(queue_name), redis.client.host, redis.client.port, namespace, Time.now.to_i )
-            rescue Redis::CannotConnectError => e
-              logger.error("Enqueuing heartbeat job for #{queue_name} crashed: #{e.inspect}")
-              logger.error("\n#{e.backtrace.join("\n")}")
             end
           end
         end
@@ -319,6 +320,14 @@ module Resque
         $0 = "rake --trace resque:stuck_queue #{redis.inspect} QUEUES=#{queues.join(",")}"
       end
 
+      def handle_redis_disconnect(error_message)
+        yield
+      rescue Redis::BaseError, SocketError => e
+        message = error_message.respond_to?(:call) ? error_message.call(e) : error_message
+        logger.error(message)
+        logger.error("\n#{e.backtrace.join("\n")}")
+        raise e unless config[:redis_disconnect_recovery]
+      end
     end
   end
 end
