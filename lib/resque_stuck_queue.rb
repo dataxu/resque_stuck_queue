@@ -335,6 +335,7 @@ module Resque
         logger.error(message)
         logger.error("\n#{e.backtrace.join("\n")}")
         if disconnect_recovery
+          logger.error("Sleeping for #{recovery_interval} before trying again")
           sleep recovery_interval
         else
           raise e
