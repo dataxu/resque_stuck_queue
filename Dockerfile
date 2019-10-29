@@ -1,7 +1,14 @@
-FROM ruby:1.9.3-p551
-ARG BUNDLER_VERSION=1.15.4
+FROM ruby:2.5.1
+ARG BUNDLER_VERSION=1.16.4
 
-RUN apt-get update -qq && \
+RUN touch /etc/apt/apt.conf.d/99fixbadproxy \
+    && echo "Acquire::http::Pipeline-Depth 0;" >> /etc/apt/apt.conf.d/99fixbadproxy \
+    && echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99fixbadproxy \
+    && echo "Acquire::BrokenProxy true;" >> /etc/apt/apt.conf.d/99fixbadproxy \
+    && apt-get update -o Acquire::CompressionTypes::Order::=gz \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get update -y && \
     apt-get install -qy curl jq python3 python3-dev python3-pip python3-yaml && \
     pip3 install awscli && \
     apt-get clean
