@@ -1,5 +1,5 @@
-FROM ruby:2.5.1
-ARG BUNDLER_VERSION=1.16.4
+FROM ruby:1.9.3-p551
+ARG BUNDLER_VERSION=1.15.4
 
 RUN touch /etc/apt/apt.conf.d/99fixbadproxy \
     && echo "Acquire::http::Pipeline-Depth 0;" >> /etc/apt/apt.conf.d/99fixbadproxy \
